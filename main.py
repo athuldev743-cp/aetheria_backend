@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import openai
 
-from AI.gemini import Gemini
+from .AI.gemini import Gemini
 from schemas import ChatResponse
 
 # ---- IGNORE WARNINGS ----
