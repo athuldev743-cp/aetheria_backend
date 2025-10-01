@@ -4,7 +4,7 @@ import warnings
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import openai
+from openai import OpenAI  # New OpenAI API
 
 from AI.gemini import Gemini
 from schemas import ChatResponse
@@ -22,15 +22,22 @@ if not GEMINI_API_KEY or not OPENAI_API_KEY:
     raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY environment variable not set.")
 
 # ---- INIT CLIENTS ----
-# OpenAI client (v0.28.1) - OLD API
-openai.api_key = OPENAI_API_KEY
+# OpenAI client (NEW API) with proxy workaround for Render
+try:
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+except TypeError as e:
+    if "proxies" in str(e):
+        # Workaround for proxy issues
+        import httpx
+        openai_client = OpenAI(
+            api_key=OPENAI_API_KEY,
+            http_client=httpx.Client(proxies=None)
+        )
+    else:
+        raise
 
-# Gemini AI agent - BYPASS THE CORRUPTED FILE
-SYSTEM_PROMPT_PATH = "src/prompts/system_prompt.md"
+# Gemini AI agent - Use hardcoded prompt for Render
 system_prompt = "You are Aetheria AI, a helpful and knowledgeable assistant. Provide clear, concise, and accurate responses to user queries."
-
-# Skip file reading completely to avoid Unicode errors
-print("Using default system prompt")
 
 gemini_ai = Gemini(api_key=GEMINI_API_KEY, system_prompt=system_prompt)
 
@@ -40,6 +47,7 @@ app = FastAPI(title="Aetheria AI Backend")
 origins = [
     "https://aetheria-97jv.vercel.app",
     "http://localhost:5173",
+    "https://your-render-app.onrender.com"  # Add your Render URL
 ]
 
 app.add_middleware(
@@ -66,23 +74,24 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
             if not audio.content_type.startswith("audio/"):
                 raise HTTPException(status_code=400, detail="Invalid audio file type")
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                content = await audio.read()
-                if not content:
-                    raise HTTPException(status_code=400, detail="Empty audio file")
-                tmp.write(content)
-                tmp_path = tmp.name
+            # For Render, use in-memory processing
+            content = await audio.read()
+            if not content:
+                raise HTTPException(status_code=400, detail="Empty audio file")
 
             try:
-                with open(tmp_path, "rb") as audio_file:
-                    # OLD OPENAI API FOR WHISPER
-                    transcription = openai.Audio.transcribe("whisper-1", audio_file)
-                    user_text = transcription["text"]
+                # Use in-memory file-like object
+                from io import BytesIO
+                audio_file = BytesIO(content)
+                audio_file.name = "audio.wav"
+                
+                transcription = openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file
+                )
+                user_text = transcription.text
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Audio processing failed: {str(e)}")
-            finally:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
 
         # ---- TEXT PROMPT ----
         elif prompt:

@@ -1,13 +1,13 @@
 import google.generativeai as genai
-from AI.base import AIplatform  # Your base class
+from AI.base import AIplatform
 
 class Gemini(AIplatform):
     def __init__(self, api_key: str, system_prompt: str = None):
         self.api_key = api_key
-        self.system_prompt = system_prompt
+        self.system_prompt = system_prompt or "You are a helpful AI assistant."
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash")  # Fixed model name
-
+        self.model = genai.GenerativeModel('gemini-pro')
+    
     def chat(self, prompt: str) -> str:
         try:
             if self.system_prompt:
