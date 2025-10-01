@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from .base import AIplatform
+from AI.base import AIplatform  # Changed from .base to AI.base
 
 class Gemini(AIplatform):
     def __init__(self, api_key: str, system_prompt: str = None):
