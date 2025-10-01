@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # or ["http://localhost:5500"] if running locally
+    allow_origins=["https://your-frontend-domain.github.io"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

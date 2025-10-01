@@ -1,0 +1,23 @@
+# Frontend build / static files you already deployed
+frontend/build/
+frontend/dist/
+frontend/node_modules/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Environment variables
+.env
+
+# VSCode / IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
