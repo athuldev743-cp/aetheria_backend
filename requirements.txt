@@ -1,27 +1,7 @@
-# FastAPI web framework
-fastapi==0.111.1
-uvicorn[standard]==0.23.2
-
-# OpenAI official library (v2 stable)
-openai==2.0.0
-
-# Google Gemini AI
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-dotenv==1.0.1
+requests==2.32.3
 google-generativeai==0.8.5
-
-# HTTP & request utilities
-httpx==0.25.0
-requests==2.31.0
-
-# Environment variables
-python-dotenv==1.0.0
-
-# Temporary file handling & utilities
-anyio==3.7.1
-tqdm==4.66.1
-
-# Optional: audio processing
-pydub==0.25.1
-soundfile==0.12.1
-
-# Optional: data validation
-pydantic==2.5.2
+openai==0.28.1
+python-multipart==0.0.9

@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import openai
 
-# Absolute import (fixed relative import issue)
 from AI.gemini import Gemini
 from schemas import ChatResponse
 
@@ -23,17 +22,15 @@ if not GEMINI_API_KEY or not OPENAI_API_KEY:
     raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY environment variable not set.")
 
 # ---- INIT CLIENTS ----
-# OpenAI v2 client
-openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# OpenAI client (v0.28.1) - OLD API
+openai.api_key = OPENAI_API_KEY
 
-# Gemini AI agent
+# Gemini AI agent - BYPASS THE CORRUPTED FILE
 SYSTEM_PROMPT_PATH = "src/prompts/system_prompt.md"
-system_prompt = ""
-if os.path.exists(SYSTEM_PROMPT_PATH):
-    with open(SYSTEM_PROMPT_PATH, "r", encoding="utf-8") as f:
-        system_prompt = f.read()
-else:
-    print(f"Warning: System prompt file not found at {SYSTEM_PROMPT_PATH}")
+system_prompt = "You are Aetheria AI, a helpful and knowledgeable assistant. Provide clear, concise, and accurate responses to user queries."
+
+# Skip file reading completely to avoid Unicode errors
+print("Using default system prompt")
 
 gemini_ai = Gemini(api_key=GEMINI_API_KEY, system_prompt=system_prompt)
 
@@ -78,11 +75,9 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
 
             try:
                 with open(tmp_path, "rb") as audio_file:
-                    transcription = openai_client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file
-                    )
-                user_text = transcription.text
+                    # OLD OPENAI API FOR WHISPER
+                    transcription = openai.Audio.transcribe("whisper-1", audio_file)
+                    user_text = transcription["text"]
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Audio processing failed: {str(e)}")
             finally:
