@@ -1,34 +1,37 @@
 import os
-os.environ['OPENAI_API_TYPE'] = 'openai'  # Add this line
-os.environ['OPENAI_LOG'] = 'error'        # Add this line
-
+import tempfile
 import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from AI.gemini import Gemini
-from schemas import ChatResponse
-
-import tempfile
-import openai
 from dotenv import load_dotenv
+import openai
+import google.generativeai as genai
 
-# ... rest of your code
+from AI.gemini import Gemini
+from schemas import ChatResponse  # Make sure your schema is defined
 
-# ---- LOAD ENV ---
-load_dotenv()  # MUST be called before using os.getenv
+# ---------------- ENV ----------------
+load_dotenv()  # Load .env variables
 
+# Optional: ignore deprecation warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+# Set environment variables for proxy if needed (optional)
+# os.environ["HTTP_PROXY"] = "http://yourproxy:port"
+# os.environ["HTTPS_PROXY"] = "http://yourproxy:port"
+
+# Load API keys
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
 if not gemini_api_key or not openai_api_key:
-    raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY environment variable not set.")
+    raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY not set.")
 
-# Initialize OpenAI client with new syntax
-client = openai.OpenAI(api_key=openai_api_key)
+# ---------------- Initialize clients ----------------
+# OpenAI client (v2)
+openai_client = openai.OpenAI(api_key=openai_api_key)
 
-# ---- INIT AI ----
+# Gemini client
 system_prompt_path = "src/prompts/system_prompt.md"
 system_prompt = ""
 if os.path.exists(system_prompt_path):
@@ -37,9 +40,9 @@ if os.path.exists(system_prompt_path):
 else:
     print(f"Warning: System prompt file not found at {system_prompt_path}")
 
-ai_platform = Gemini(api_key=gemini_api_key, system_prompt=system_prompt)
+gemini_client = Gemini(api_key=gemini_api_key, system_prompt=system_prompt)
 
-# ---- FASTAPI ----
+# ---------------- FastAPI setup ----------------
 app = FastAPI(title="Aetheria AI Backend")
 
 origins = [
@@ -55,22 +58,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- HEALTH CHECK ----
+# ---------------- Health check ----------------
 @app.get("/")
 async def health_check():
     return {"status": "running", "message": "Aetheria AI Backend operational"}
 
-# ---- AI RESPONSE ----
+# ---------------- AI Response ----------------
 @app.post("/ai-response", response_model=ChatResponse)
 async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
     try:
         user_text = ""
 
+        # --- Audio transcription using OpenAI ---
         if audio:
-            # Validate audio file type
-            if not audio.content_type.startswith('audio/'):
+            if not audio.content_type.startswith("audio/"):
                 raise HTTPException(status_code=400, detail="Invalid audio file type")
-            
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                 content = await audio.read()
                 if not content:
@@ -79,9 +82,8 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
                 tmp_path = tmp.name
 
             try:
-                # Updated OpenAI transcription syntax
                 with open(tmp_path, "rb") as audio_file:
-                    transcription = client.audio.transcriptions.create(
+                    transcription = openai_client.audio.transcriptions.create(
                         model="whisper-1",
                         file=audio_file
                     )
@@ -89,21 +91,22 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Audio processing failed: {str(e)}")
             finally:
-                # Always clean up the temp file
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
 
+        # --- Text prompt ---
         elif prompt:
             user_text = prompt.strip()
 
         if not user_text:
             raise HTTPException(status_code=400, detail="No prompt or audio provided.")
 
-        response_text = ai_platform.chat(user_text)
+        # --- Generate response using Gemini ---
+        response_text = gemini_client.chat(user_text)
+
         return ChatResponse(response=response_text)
 
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
