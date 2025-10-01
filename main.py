@@ -22,7 +22,7 @@ if not GEMINI_API_KEY or not OPENAI_API_KEY:
     raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY environment variable not set.")
 
 # ---- INIT CLIENTS ----
-# OpenAI client (v2)
+# OpenAI client (v2) - FIXED: Removed proxies parameter
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # Gemini AI agent
