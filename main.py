@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import openai
 
-from .AI.gemini import Gemini
+# Absolute import (fixed relative import issue)
+from AI.gemini import Gemini
 from schemas import ChatResponse
 
 # ---- IGNORE WARNINGS ----
@@ -22,7 +23,7 @@ if not GEMINI_API_KEY or not OPENAI_API_KEY:
     raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY environment variable not set.")
 
 # ---- INIT CLIENTS ----
-# OpenAI client (v2) - FIXED: Removed proxies parameter
+# OpenAI v2 client
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # Gemini AI agent
