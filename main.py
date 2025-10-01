@@ -3,7 +3,6 @@ import tempfile
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import speech_recognition as sr
 
 load_dotenv()
 
@@ -45,34 +44,12 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
 
         # ---- AUDIO HANDLING ----
         if audio:
-            content = await audio.read()
-            if not content:
-                raise HTTPException(status_code=400, detail="Empty audio file")
-
-            try:
-                # Save audio to temporary file
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp:
-                    tmp.write(content)
-                    tmp_path = tmp.name
-
-                # Use speech_recognition for audio-to-text
-                recognizer = sr.Recognizer()
-                with sr.AudioFile(tmp_path) as source:
-                    # Adjust for ambient noise and record
-                    recognizer.adjust_for_ambient_noise(source)
-                    audio_data = recognizer.record(source)
-                    user_text = recognizer.recognize_google(audio_data)
-                    
-            except sr.UnknownValueError:
-                raise HTTPException(status_code=400, detail="Could not understand audio")
-            except sr.RequestError as e:
-                raise HTTPException(status_code=400, detail=f"Speech recognition error: {str(e)}")
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Audio processing failed: {str(e)}")
-            finally:
-                # Clean up temporary file
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
+            # For now, return a message that audio is not supported
+            # You can implement alternative audio processing later
+            raise HTTPException(
+                status_code=400, 
+                detail="Audio processing is temporarily unavailable. Please use text input."
+            )
 
         # ---- TEXT PROMPT ----
         elif prompt:
