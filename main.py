@@ -22,19 +22,8 @@ if not GEMINI_API_KEY or not OPENAI_API_KEY:
     raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY environment variable not set.")
 
 # ---- INIT CLIENTS ----
-# OpenAI client (NEW API) with proxy workaround for Render
-try:
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
-except TypeError as e:
-    if "proxies" in str(e):
-        # Workaround for proxy issues
-        import httpx
-        openai_client = OpenAI(
-            api_key=OPENAI_API_KEY,
-            http_client=httpx.Client(proxies=None)
-        )
-    else:
-        raise
+# OpenAI client (NEW API v1.12.0)
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Gemini AI agent - Use hardcoded prompt for Render
 system_prompt = "You are Aetheria AI, a helpful and knowledgeable assistant. Provide clear, concise, and accurate responses to user queries."
@@ -47,7 +36,7 @@ app = FastAPI(title="Aetheria AI Backend")
 origins = [
     "https://aetheria-97jv.vercel.app",
     "http://localhost:5173",
-    "https://your-render-app.onrender.com"  # Add your Render URL
+    "https://aetheria-backend.onrender.com"  # Your Render URL
 ]
 
 app.add_middleware(
@@ -71,27 +60,50 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
 
         # ---- AUDIO HANDLING ----
         if audio:
-            if not audio.content_type.startswith("audio/"):
-                raise HTTPException(status_code=400, detail="Invalid audio file type")
+            # Accept more audio types
+            allowed_audio_types = [
+                'audio/wav', 'audio/wave', 'audio/x-wav', 
+                'audio/mpeg', 'audio/mp3', 'audio/mp4',
+                'audio/webm', 'audio/ogg', 'audio/flac',
+                'audio/aac', 'audio/x-m4a'
+            ]
+            
+            # Check if content type is audio or if it's a generic binary file
+            content_type = audio.content_type.lower() if audio.content_type else ''
+            is_audio_file = (content_type.startswith('audio/') or 
+                           content_type in ['application/octet-stream', 'binary/octet-stream', ''] or
+                           any(audio.filename.lower().endswith(ext) for ext in ['.wav', '.mp3', '.m4a', '.webm', '.ogg', '.flac', '.mpeg']))
+            
+            if not is_audio_file:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid audio file type: {content_type}. Supported: WAV, MP3, M4A, WEBM, OGG, FLAC"
+                )
 
-            # For Render, use in-memory processing
+            # For Render compatibility - use in-memory processing
             content = await audio.read()
             if not content:
                 raise HTTPException(status_code=400, detail="Empty audio file")
 
             try:
-                # Use in-memory file-like object
-                from io import BytesIO
-                audio_file = BytesIO(content)
-                audio_file.name = "audio.wav"
-                
-                transcription = openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file
-                )
-                user_text = transcription.text
+                # Save to temporary file for OpenAI
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp:
+                    tmp.write(content)
+                    tmp_path = tmp.name
+
+                with open(tmp_path, "rb") as audio_file:
+                    # NEW OPENAI API SYNTAX for v1.12.0
+                    transcription = openai_client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file
+                    )
+                    user_text = transcription.text  # New API uses .text attribute
+                    
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Audio processing failed: {str(e)}")
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
         # ---- TEXT PROMPT ----
         elif prompt:
