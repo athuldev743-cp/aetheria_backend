@@ -7,13 +7,17 @@ class Gemini(AIplatform):
         self.system_prompt = system_prompt
         genai.configure(api_key=self.api_key)
         
-        # Use gemini-1.5-flash - most widely available
+        # Use gemini-1.5-flash which is widely available
         self.model = genai.GenerativeModel('gemini-1.5-flash')
     
     def chat(self, prompt: str) -> str:
         try:
-            full_prompt = f"{self.system_prompt}\n\nUser: {prompt}" if self.system_prompt else prompt
+            if self.system_prompt:
+                full_prompt = f"{self.system_prompt}\n\nUser: {prompt}"
+            else:
+                full_prompt = prompt
+            
             response = self.model.generate_content(full_prompt)
             return response.text
         except Exception as e:
-            return f"Error: {str(e)}"
+            return f"Error generating response: {str(e)}"
