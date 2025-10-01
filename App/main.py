@@ -1,18 +1,45 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from App.AI.gemini import Gemini
-from App.schemas import ChatResponse
+from app.AI.gemini import Gemini
+from app.schemas import ChatResponse
+
 import os
 import tempfile
-import openai  # Whisper transcription
+import openai
+from dotenv import load_dotenv
 
+
+
+
+
+# ---- LOAD ENV ----
+load_dotenv()  # MUST be called before using os.getenv
+
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+if not gemini_api_key or not openai_api_key:
+    raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY environment variable not set.")
+
+openai.api_key = openai_api_key
+
+# ---- INIT AI ----
+system_prompt_path = "src/prompts/system_prompt.md"
+system_prompt = ""
+if os.path.exists(system_prompt_path):
+    with open(system_prompt_path, "r") as f:
+        system_prompt = f.read()
+
+ai_platform = Gemini(api_key=gemini_api_key, system_prompt=system_prompt)
+
+# ---- FASTAPI ----
 app = FastAPI(title="Aetheria AI Backend")
 
-# ---- CORS ----
 origins = [
-    "https://aetheria-ten.vercel.app",  # frontend URL
+    "https://aetheria-ten.vercel.app",
     "http://localhost:5173",
 ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -21,58 +48,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- Load system prompt ----
-def load_system_prompt():
-    try:
-        with open("src/prompts/system_prompt.md", "r") as f:
-            return f.read()
-    except FileNotFoundError:
-        return None
-
-system_prompt = load_system_prompt()
-
-# ---- Initialize AI ----
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-if not gemini_api_key:
-    raise ValueError("GEMINI_API_KEY environment variable not set.")
-
-ai_platform = Gemini(api_key=gemini_api_key, system_prompt=system_prompt)
-
-# ---- OpenAI Whisper API Key ----
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
-    raise ValueError("OPENAI_API_KEY environment variable not set.")
-openai.api_key = openai_api_key
-
-# ---- Health check ----
+# ---- HEALTH CHECK ----
 @app.get("/")
 async def health_check():
-    return {"status": "running", "message": "Aetheria AI Backend is operational"}
+    return {"status": "running", "message": "Aetheria AI Backend operational"}
 
-# ---- AI Response with optional audio upload ----
+# ---- AI RESPONSE ----
 @app.post("/ai-response", response_model=ChatResponse)
 async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
     try:
+        user_text = ""
+
         if audio:
-            # Save temporarily
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                 tmp.write(await audio.read())
                 tmp_path = tmp.name
 
-            # Transcribe with Whisper
             transcription = openai.Audio.transcriptions.create(
                 model="whisper-1",
                 file=open(tmp_path, "rb")
             )
             user_text = transcription["text"]
+            os.remove(tmp_path)
+
         elif prompt:
             user_text = prompt
-        else:
+
+        if not user_text:
             raise HTTPException(status_code=400, detail="No prompt or audio provided.")
 
-        # Generate AI response
         response_text = ai_platform.chat(user_text)
         return ChatResponse(response=response_text)
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
