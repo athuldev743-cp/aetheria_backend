@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 
 
-# ---- LOAD ENV ----
+# ---- LOAD ENV ---
 load_dotenv()  # MUST be called before using os.getenv
 
 gemini_api_key = os.getenv("GEMINI_API_KEY")
