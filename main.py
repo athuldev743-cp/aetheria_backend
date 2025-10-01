@@ -55,24 +55,9 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
                     tmp.write(content)
                     tmp_path = tmp.name
 
-                # Convert webm to wav if needed
-                if audio.filename and audio.filename.endswith('.webm'):
-                    import subprocess
-                    wav_path = tmp_path + '.wav'
-                    try:
-                        subprocess.run([
-                            'ffmpeg', '-i', tmp_path, '-acodec', 'pcm_s16le', 
-                            '-ac', '1', '-ar', '16000', wav_path, '-y'
-                        ], check=True, capture_output=True)
-                        final_path = wav_path
-                    except:
-                        final_path = tmp_path  # Fallback to original
-                else:
-                    final_path = tmp_path
-
                 # Use speech_recognition for audio-to-text
                 recognizer = sr.Recognizer()
-                with sr.AudioFile(final_path) as source:
+                with sr.AudioFile(tmp_path) as source:
                     # Adjust for ambient noise and record
                     recognizer.adjust_for_ambient_noise(source)
                     audio_data = recognizer.record(source)
@@ -85,11 +70,9 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Audio processing failed: {str(e)}")
             finally:
-                # Clean up temporary files
+                # Clean up temporary file
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
-                if 'wav_path' in locals() and os.path.exists(wav_path):
-                    os.remove(wav_path)
 
         # ---- TEXT PROMPT ----
         elif prompt:
