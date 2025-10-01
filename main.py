@@ -4,10 +4,6 @@ import warnings
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import openai  # OLD API - NO PROXY ISSUES
-
-from AI.gemini import Gemini
-from schemas import ChatResponse
 
 # ---- IGNORE WARNINGS ----
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -22,8 +18,12 @@ if not GEMINI_API_KEY or not OPENAI_API_KEY:
     raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY environment variable not set.")
 
 # ---- INIT CLIENTS ----
-# OpenAI client (OLD API v0.28.1) - NO PROXY ISSUES
+# Import OpenAI AFTER environment check to avoid early failures
+import openai  # This MUST be v0.28.1
 openai.api_key = OPENAI_API_KEY
+
+from AI.gemini import Gemini
+from schemas import ChatResponse
 
 # Gemini AI agent
 system_prompt = "You are Aetheria AI, a helpful and knowledgeable assistant. Provide clear, concise, and accurate responses to user queries."
@@ -59,13 +59,9 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
 
         # ---- AUDIO HANDLING ----
         if audio:
-            content_type = audio.content_type.lower() if audio.content_type else ''
-            is_audio_file = (content_type.startswith('audio/') or 
-                           content_type in ['application/octet-stream', 'binary/octet-stream', ''] or
-                           any(audio.filename.lower().endswith(ext) for ext in ['.wav', '.mp3', '.m4a', '.webm', '.ogg', '.flac', '.mpeg']))
-            
-            if not is_audio_file:
-                raise HTTPException(status_code=400, detail=f"Invalid audio file type: {content_type}")
+            # Simple audio validation
+            if audio.content_type and not audio.content_type.startswith('audio/'):
+                raise HTTPException(status_code=400, detail="Invalid audio file type")
 
             content = await audio.read()
             if not content:
@@ -77,7 +73,7 @@ async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
                     tmp_path = tmp.name
 
                 with open(tmp_path, "rb") as audio_file:
-                    # OLD API SYNTAX
+                    # OLD OPENAI API - v0.28.1
                     transcription = openai.Audio.transcribe("whisper-1", audio_file)
                     user_text = transcription["text"]
                     
