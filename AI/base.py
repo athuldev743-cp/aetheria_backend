@@ -1,8 +1,9 @@
-from abc import ABC, abstractmethod
+# AI/base.py
+from livekit.jwt import AccessToken
 
-class AIplatform(ABC):
-
-    @abstractmethod
-    def chat(self, prompt: str) -> str:
-        """Send a prompt to AI and return response text."""
-        pass
+def generate_token(api_key: str, api_secret: str, identity: str):
+    """
+    Generate a LiveKit JWT access token
+    """
+    token = AccessToken(api_key=api_key, api_secret=api_secret).with_identity(identity).to_jwt()
+    return token
