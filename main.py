@@ -1,12 +1,10 @@
 # main.py
 import os
-import io
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from AI.livekit_ai import LiveKitAI
 
-# Load environment variables - different approach for production
+# Load environment variables
 if os.path.exists(".env"):
     load_dotenv()
 
@@ -14,22 +12,14 @@ LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 LIVEKIT_URL = os.getenv("LIVEKIT_URL")
 
-# For Render deployment, these will be set in the dashboard
-if not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET or not LIVEKIT_URL:
-    # Don't raise error in production, just log
-    print("Warning: LiveKit environment variables not set. Token generation will fail.")
-
 app = FastAPI(title="Aetheria AI Backend")
 
-# CORS - allow all origins in production or specific ones
-if os.getenv("RENDER"):  # Render sets this environment variable
-    origins = [
-        "https://aetheria-97jv.vercel.app",
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ]
-else:
-    origins = ["*"]  # More restrictive in production
+# CORS configuration
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://aetheria-97jv.vercel.app",
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,33 +29,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# LiveKit AI - initialize only if credentials are available
-if LIVEKIT_API_KEY and LIVEKIT_API_SECRET:
-    livekit_ai = LiveKitAI(
-        api_key=LIVEKIT_API_KEY,
-        api_secret=LIVEKIT_API_SECRET,
-        room_name="default-room"
-    )
-else:
+# Initialize LiveKitAI only if credentials are available
+try:
+    from AI.livekit_ai import LiveKitAI
+    if LIVEKIT_API_KEY and LIVEKIT_API_SECRET:
+        livekit_ai = LiveKitAI(
+            api_key=LIVEKIT_API_KEY,
+            api_secret=LIVEKIT_API_SECRET,
+            room_name="default-room"
+        )
+    else:
+        livekit_ai = None
+        print("Warning: LiveKit credentials not set")
+except ImportError as e:
+    print(f"Warning: Could not import LiveKitAI: {e}")
     livekit_ai = None
 
 @app.get("/")
 async def health_check():
-    return {"status": "running", "environment": "production" if os.getenv("RENDER") else "development"}
+    return {
+        "status": "running", 
+        "livekit_configured": livekit_ai is not None,
+        "environment": "production" if os.getenv("RENDER") else "development"
+    }
 
 @app.post("/ai-response")
-async def ai_response(prompt: str = Form(None), audio: UploadFile = File(None)):
+async def ai_response(prompt: str = Form(...)):
     try:
-        if prompt:
-            text_prompt = prompt.strip()
-            response_text = f"LiveKit AI received your prompt: {text_prompt}"  # Default response
-            
-            if livekit_ai:
-                response_text = livekit_ai.chat(text_prompt)
-            
-            return {"response": response_text}
+        text_prompt = prompt.strip()
+        if livekit_ai:
+            response_text = livekit_ai.chat(text_prompt)
         else:
-            raise HTTPException(status_code=400, detail="No prompt provided.")
+            response_text = f"AI received: {text_prompt} (LiveKit not configured)"
+        
+        return {"response": response_text}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -76,9 +73,43 @@ def get_livekit_token(identity: str):
         raise HTTPException(status_code=400, detail="Identity required")
     
     if not livekit_ai:
-        raise HTTPException(status_code=500, detail="LiveKit credentials not configured")
+        raise HTTPException(status_code=500, detail="LiveKit not configured. Check environment variables.")
+    
+    try:
+        token = livekit_ai.generate_token(identity)
+        return {"token": token, "url": LIVEKIT_URL}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Token generation failed: {str(e)}")
 
-    token = livekit_ai.generate_token(identity)
-    return {"token": token, "url": LIVEKIT_URL}
+@app.get("/test-token")
+def test_token(identity: str = "test-user"):
+    """Test endpoint to verify token generation works"""
+    if not livekit_ai:
+        return {
+            "success": False,
+            "error": "LiveKit not configured",
+            "message": "Check LIVEKIT_API_KEY and LIVEKIT_API_SECRET environment variables"
+        }
+    
+    try:
+        token = livekit_ai.generate_token(identity)
+        return {
+            "success": True,
+            "token": token,
+            "identity": identity,
+            "message": "Token generated successfully"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Token generation failed"
+        }
 
-# ... rest of your endpoints
+@app.post("/create-room")
+async def create_room():
+    if not livekit_ai:
+        raise HTTPException(status_code=500, detail="LiveKit not configured")
+    
+    room = await livekit_ai.create_room()
+    return {"room": room}
