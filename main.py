@@ -1,6 +1,6 @@
 # main.py
 import os
-from fastapi import FastAPI, Form, HTTPException
+from fastapi import FastAPI, Form, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -54,15 +54,25 @@ async def health_check():
     }
 
 @app.post("/ai-response")
-async def ai_response(prompt: str = Form(...)):
+async def ai_response(
+    prompt: str = Form(None), 
+    audio: UploadFile = File(None)  # Fixed: Use = File(None) instead of = File(None))
+):
     try:
-        text_prompt = prompt.strip()
-        if livekit_ai:
-            response_text = livekit_ai.chat(text_prompt)
-        else:
-            response_text = f"AI received: {text_prompt} (LiveKit not configured)"
+        if audio:
+            # Return a helpful message about audio being disabled
+            return {"response": "🎤 Voice messages are currently being upgraded! Please use text input for now. I can still help you with LiveKit tokens, room creation, and AI conversations!"}
         
-        return {"response": response_text}
+        elif prompt:
+            text_prompt = prompt.strip()
+            if livekit_ai:
+                response_text = livekit_ai.chat(text_prompt)
+            else:
+                response_text = f"AI received: {text_prompt} (LiveKit not configured)"
+            
+            return {"response": response_text}
+        else:
+            raise HTTPException(status_code=400, detail="No prompt provided.")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

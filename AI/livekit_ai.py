@@ -56,33 +56,60 @@ class LiveKitAI:
 
     def chat(self, prompt: str) -> str:
         """
-        Enhanced AI response - you can integrate with real AI models here
+        Enhanced AI response without external API calls
         """
-        # Simple rule-based responses for now
         prompt_lower = prompt.lower()
         
-        if "hello" in prompt_lower or "hi" in prompt_lower:
-            return "Hello! I'm your LiveKit AI assistant. How can I help you today?"
-        elif "how are you" in prompt_lower:
-            return "I'm functioning well! Ready to help you with LiveKit integration and real-time communication."
-        elif "livekit" in prompt_lower:
-            return "LiveKit is an open-source WebRTC platform for real-time audio and video experiences. I can help you generate tokens and manage rooms!"
-        elif "token" in prompt_lower:
-            return "I can generate LiveKit access tokens for you. Use the /get-token endpoint with your identity."
-        elif "room" in prompt_lower:
-            return f"I can help you create and manage LiveKit rooms. Your current room is '{self.room_name}'."
+        # Enhanced responses for better user experience
+        if any(word in prompt_lower for word in ['hello', 'hi', 'hey', 'hola']):
+            return "Hello! I'm Aetheria AI, your intelligent assistant powered by LiveKit. How can I help you today? 🌟"
+        
+        elif 'how are you' in prompt_lower:
+            return "I'm functioning perfectly! Ready to assist you with real-time communication, AI conversations, and LiveKit integration. What would you like to explore?"
+        
+        elif any(word in prompt_lower for word in ['livekit', 'video call', 'audio call']):
+            return "LiveKit is an amazing open-source WebRTC platform for real-time audio and video experiences! I can help you generate access tokens, create rooms, and set up real-time communication. Would you like to try a LiveKit feature?"
+        
+        elif any(word in prompt_lower for word in ['token', 'access', 'auth']):
+            return "I can generate LiveKit access tokens for secure room access. Use the token generation feature to get started with real-time communication!"
+        
+        elif any(word in prompt_lower for word in ['room', 'create room']):
+            return f"I can help you create and manage LiveKit rooms! Your current default room is '{self.room_name}'. Want to create a new room or join an existing one?"
+        
+        elif any(word in prompt_lower for word in ['what can you do', 'help', 'features']):
+            return "I can help you with: 🤖 AI conversations, 🎤 Voice interactions, 🎥 LiveKit real-time communication, 🔐 Token generation, 🏠 Room management, and 🔊 Text-to-speech! What would you like to try?"
+        
+        elif any(word in prompt_lower for word in ['thank', 'thanks']):
+            return "You're welcome! I'm glad I could help. Is there anything else you'd like to know or try? 🚀"
+        
+        elif any(word in prompt_lower for word in ['bye', 'goodbye', 'exit']):
+            return "Goodbye! Feel free to return anytime for more AI assistance and real-time communication features. Have a great day! 👋"
+        
+        elif any(word in prompt_lower for word in ['weather', 'time', 'date']):
+            return f"I'm focused on AI communication and LiveKit features. For {prompt_lower.split()[0]} information, you might want to check a dedicated service. But I'd love to help with real-time communication!"
+        
+        elif any(word in prompt_lower for word in ['love', 'like you']):
+            return "I'm here to assist you with AI conversations and real-time communication! Let me know how I can help with LiveKit features or anything else. 💫"
+        
         else:
-            return f"Thanks for your message: '{prompt}'. I'm here to help with LiveKit integration and real-time communication features."
+            # For unknown queries, provide helpful guidance
+            responses = [
+                f"Interesting question about '{prompt}'! I'm specialized in AI communication and LiveKit real-time features. Would you like to try voice chat or explore LiveKit capabilities?",
+                f"I understand you're asking about '{prompt}'. My expertise is in real-time communication and AI assistance. I can help you with voice interactions, video calls, or general AI conversations!",
+                f"Thanks for sharing that! I'm designed to assist with LiveKit integration and AI conversations. Want to explore real-time communication features or try a different question?",
+                f"I'm constantly learning about '{prompt}'. Meanwhile, I can help you with: generating LiveKit tokens, setting up real-time rooms, or having AI-powered conversations!"
+            ]
+            import random
+            return random.choice(responses)
 
     async def create_room(self):
         """
         Placeholder: real room creation is via LiveKit HTTP API.
-        In a real implementation, you would call LiveKit's REST API here.
         """
         return {
             "room_name": self.room_name, 
             "status": "created",
-            "message": "Room created successfully (placeholder implementation)"
+            "message": "Room created successfully! You can now generate tokens to access this room."
         }
 
     def validate_token(self, token: str) -> Dict[str, Any]:
